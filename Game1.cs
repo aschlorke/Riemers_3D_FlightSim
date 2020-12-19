@@ -22,7 +22,10 @@ namespace _3D_FlightSim
 
         private Texture2D _sceneryTexture;
         private Effect _effect;
+
         private Model _xwingModel;
+        private Vector3 _xwingPosition = new Vector3 (8, 1, -3);
+        private Quaternion _xwingRotation = Quaternion.Identity;
 
         private Vector3 _lightDirection = new Vector3 (3, -2, 5);
         private float _ambientLight = 0.3f;
@@ -85,6 +88,7 @@ namespace _3D_FlightSim
                 Exit ();
 
             // TODO: Add your update logic here
+            UpdateCamera ();
             ProcessKeyboard ();
 
             base.Update (gameTime);
@@ -120,7 +124,7 @@ namespace _3D_FlightSim
 
             GraphicsDevice.DepthStencilState = DepthStencilState.Default;
             DrawCity ();
-            DrawModel (_xwingModel);
+            DrawModel ();
 
             if (_isDebug)
             {
@@ -140,6 +144,26 @@ namespace _3D_FlightSim
         private void SetupCamera ()
         {
             _viewMatrix = Matrix.CreateLookAt (new Vector3 (20, 13, -5), new Vector3 (8, 0, -7), new Vector3 (0, 1, 0));
+            _projectionMatrix = Matrix.CreatePerspectiveFieldOfView (MathHelper.PiOver4, _device.Viewport.AspectRatio, 0.2f, 500.0f);
+        }
+
+        private void UpdateCamera ()
+        {
+            // offset from xwing model
+            Vector3 cameraPosition = new Vector3 (0, 0.1f, 0.6f);
+
+            // rotate the camera to align with the rotation of the xwing 
+            cameraPosition = Vector3.Transform (cameraPosition, Matrix.CreateFromQuaternion (_xwingRotation));
+
+            // move the camera so that it ligns up behind the xwing
+            cameraPosition += _xwingPosition;
+
+            // based on the rotation, figure out which direction is 'up' for the camera
+            Vector3 cameraUp = Vector3.Up;
+            cameraUp = Vector3.Transform (cameraUp, Matrix.CreateFromQuaternion (_xwingRotation));
+
+            // update the view and projection matrices
+            _viewMatrix = Matrix.CreateLookAt (cameraPosition, _xwingPosition, cameraUp);
             _projectionMatrix = Matrix.CreatePerspectiveFieldOfView (MathHelper.PiOver4, _device.Viewport.AspectRatio, 0.2f, 500.0f);
         }
 
@@ -278,18 +302,19 @@ namespace _3D_FlightSim
             }
         }
 
-        private void DrawModel (Model model)
+        private void DrawModel ()
         {
             float scale = 0.0005f;
             Matrix worldMatrix =
                 Matrix.CreateScale (scale, scale, scale) *
                 Matrix.CreateRotationY (MathHelper.Pi) *
-                Matrix.CreateTranslation (new Vector3 (19, 12, -5));
+                Matrix.CreateFromQuaternion (_xwingRotation) *
+                Matrix.CreateTranslation (_xwingPosition);
 
-            Matrix[] transforms = new Matrix[model.Bones.Count];
-            model.CopyAbsoluteBoneTransformsTo (transforms);
+            Matrix[] transforms = new Matrix[_xwingModel.Bones.Count];
+            _xwingModel.CopyAbsoluteBoneTransformsTo (transforms);
 
-            foreach (var mesh in model.Meshes)
+            foreach (var mesh in _xwingModel.Meshes)
             {
                 foreach (var effect in mesh.Effects)
                 {
