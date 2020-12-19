@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 
 
@@ -14,15 +15,19 @@ namespace _3D_FlightSim
         private GraphicsDeviceManager _graphics;
         private SpriteBatch _spriteBatch;
         private GraphicsDevice _device;
+        private Random _random;
 
         private Matrix _viewMatrix;
         private Matrix _projectionMatrix;
 
         private Texture2D _sceneryTexture;
         private Effect _effect;
+        private Model _xwingModel;
 
-        private int [,] _floorPlan;
+        private int[,] _floorPlan;
         private VertexBuffer _cityVertexBuffer;
+
+        private int[] _buildingHeights = new int[] { 0, 2, 2, 6, 5, 4 };
 
         public Game1 ()
         {
@@ -40,6 +45,8 @@ namespace _3D_FlightSim
             _graphics.ApplyChanges ();
             Window.Title = "Riemer's 3D Flight Simulator";
 
+            _random = new Random ();
+
             LoadFloorPlan ();
 
             base.Initialize ();
@@ -49,9 +56,11 @@ namespace _3D_FlightSim
         {
             _spriteBatch = new SpriteBatch (GraphicsDevice);
 
-            _sceneryTexture = Content.Load<Texture2D> ("texturemap");
-            byte [] bytecode = File.ReadAllBytes (@"Content/CompiledEffects/effects.mgfx");
+            _sceneryTexture = Content.Load<Texture2D> (@"Textures\texturemap");
+            byte[] bytecode = File.ReadAllBytes (@"Content/CompiledEffects/effects.mgfx");
             _effect = new Effect (_device, bytecode);
+
+            _xwingModel = LoadModel (@"Models\xwing");
 
             SetupCamera ();
             SetupVertices ();
@@ -69,16 +78,17 @@ namespace _3D_FlightSim
 
         protected override void Draw (GameTime gameTime)
         {
-            GraphicsDevice.Clear (Color.CornflowerBlue);
+            GraphicsDevice.Clear (ClearOptions.Target | ClearOptions.DepthBuffer, Color.DarkSlateBlue, 1.0f, 0);
 
             DrawCity ();
+            DrawModel (_xwingModel);
 
             base.Draw (gameTime);
         }
 
         private void SetupCamera ()
         {
-            _viewMatrix = Matrix.CreateLookAt (new Vector3 (3, 5, 2), new Vector3 (2, 0, -1), new Vector3 (0, 1, 0));
+            _viewMatrix = Matrix.CreateLookAt (new Vector3 (20, 13, -5), new Vector3 (8, 0, -7), new Vector3 (0, 1, 0));
             _projectionMatrix = Matrix.CreatePerspectiveFieldOfView (MathHelper.PiOver4, _device.Viewport.AspectRatio, 0.2f, 500.0f);
         }
 
@@ -87,24 +97,66 @@ namespace _3D_FlightSim
             int cityWidth = _floorPlan.GetLength (0);
             int cityLength = _floorPlan.GetLength (1);
 
-            int imagesInTexture = 11;
-            int desiredImage = 0;
+            int differentBuildings = _buildingHeights.Length - 1;
+            float imagesInTexture = 1 + differentBuildings * 2;
 
             List<VertexPositionNormalTexture> verticesList = new List<VertexPositionNormalTexture> ();
             for (int x = 0; x < cityWidth; x++)
             {
                 for (int z = 0; z < cityLength; z++)
                 {
-                    if (_floorPlan [x, z] == 0)
-                    {
-                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, 0, -z), new Vector3 (0, 1, 0), new Vector2 ((desiredImage + 0f) / imagesInTexture, 1)));
-                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, 0, -z - 1), new Vector3 (0, 1, 0), new Vector2 ((desiredImage + 0f) / imagesInTexture, 0)));
-                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, 0, -z), new Vector3 (0, 1, 0), new Vector2 ((desiredImage + 1.0f) / imagesInTexture, 1)));
+                    int currentBuilding = _floorPlan[x, z];
+                    int desiredImage = currentBuilding * 2;
+                    int buildingHeight = _buildingHeights[currentBuilding];
 
-                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, 0, -z - 1), new Vector3 (0, 1, 0), new Vector2 ((desiredImage + 0f) / imagesInTexture, 0)));
-                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, 0, -z - 1), new Vector3 (0, 1, 0), new Vector2 ((desiredImage + 1.0f) / imagesInTexture, 0)));
-                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, 0, -z), new Vector3 (0, 1, 0), new Vector2 ((desiredImage + 1.0f) / imagesInTexture, 1)));
+                    // floor or ceiling
+                    verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, buildingHeight, -z), new Vector3 (0, 1, 0), new Vector2 ((desiredImage + 0f) / imagesInTexture, 1)));
+                    verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, buildingHeight, -z - 1), new Vector3 (0, 1, 0), new Vector2 ((desiredImage + 0f) / imagesInTexture, 0)));
+                    verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, buildingHeight, -z), new Vector3 (0, 1, 0), new Vector2 ((desiredImage + 1.0f) / imagesInTexture, 1)));
+
+                    verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, buildingHeight, -z - 1), new Vector3 (0, 1, 0), new Vector2 ((desiredImage + 0f) / imagesInTexture, 0)));
+                    verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, buildingHeight, -z - 1), new Vector3 (0, 1, 0), new Vector2 ((desiredImage + 1.0f) / imagesInTexture, 0)));
+                    verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, buildingHeight, -z), new Vector3 (0, 1, 0), new Vector2 ((desiredImage + 1.0f) / imagesInTexture, 1)));
+
+                    if (currentBuilding != 0)
+                    {
+                        // front wall
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, 0, -z - 1), new Vector3 (0, 0, -1), new Vector2 (desiredImage / imagesInTexture, 1)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, buildingHeight, -z - 1), new Vector3 (0, 0, -1), new Vector2 ((desiredImage - 1) / imagesInTexture, 0)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, 0, -z - 1), new Vector3 (0, 0, -1), new Vector2 ((desiredImage - 1) / imagesInTexture, 1)));
+
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, buildingHeight, -z - 1), new Vector3 (0, 0, -1), new Vector2 ((desiredImage - 1) / imagesInTexture, 0)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, 0, -z - 1), new Vector3 (0, 0, -1), new Vector2 (desiredImage / imagesInTexture, 1)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, buildingHeight, -z - 1), new Vector3 (0, 0, -1), new Vector2 (desiredImage / imagesInTexture, 0)));
+
+                        //back wall
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, 0, -z), new Vector3 (0, 0, 1), new Vector2 (desiredImage / imagesInTexture, 1)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, 0, -z), new Vector3 (0, 0, 1), new Vector2 ((desiredImage - 1) / imagesInTexture, 1)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, buildingHeight, -z), new Vector3 (0, 0, 1), new Vector2 ((desiredImage - 1) / imagesInTexture, 0)));
+
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, buildingHeight, -z), new Vector3 (0, 0, 1), new Vector2 ((desiredImage - 1) / imagesInTexture, 0)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, buildingHeight, -z), new Vector3 (0, 0, 1), new Vector2 (desiredImage / imagesInTexture, 0)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, 0, -z), new Vector3 (0, 0, 1), new Vector2 (desiredImage / imagesInTexture, 1)));
+
+                        //left wall
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, 0, -z), new Vector3 (-1, 0, 0), new Vector2 (desiredImage / imagesInTexture, 1)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, 0, -z - 1), new Vector3 (-1, 0, 0), new Vector2 ((desiredImage - 1) / imagesInTexture, 1)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, buildingHeight, -z - 1), new Vector3 (-1, 0, 0), new Vector2 ((desiredImage - 1) / imagesInTexture, 0)));
+
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, buildingHeight, -z - 1), new Vector3 (-1, 0, 0), new Vector2 ((desiredImage - 1) / imagesInTexture, 0)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, buildingHeight, -z), new Vector3 (-1, 0, 0), new Vector2 (desiredImage / imagesInTexture, 0)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x, 0, -z), new Vector3 (-1, 0, 0), new Vector2 (desiredImage / imagesInTexture, 1)));
+
+                        //right wall
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, 0, -z), new Vector3 (1, 0, 0), new Vector2 (desiredImage / imagesInTexture, 1)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, buildingHeight, -z - 1), new Vector3 (1, 0, 0), new Vector2 ((desiredImage - 1) / imagesInTexture, 0)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, 0, -z - 1), new Vector3 (1, 0, 0), new Vector2 ((desiredImage - 1) / imagesInTexture, 1)));
+
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, buildingHeight, -z - 1), new Vector3 (1, 0, 0), new Vector2 ((desiredImage - 1) / imagesInTexture, 0)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, 0, -z), new Vector3 (1, 0, 0), new Vector2 (desiredImage / imagesInTexture, 1)));
+                        verticesList.Add (new VertexPositionNormalTexture (new Vector3 (x + 1, buildingHeight, -z), new Vector3 (1, 0, 0), new Vector2 (desiredImage / imagesInTexture, 0)));
                     }
+
                 }
             }
 
@@ -114,21 +166,51 @@ namespace _3D_FlightSim
 
         private void LoadFloorPlan ()
         {
-            _floorPlan = new int [,]
+            _floorPlan = new int[,]
             {
-                {0, 0, 0},
-                {0, 1, 0},
-                {0, 0, 0}
+                {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                {1,0,0,1,1,0,0,0,1,1,0,0,1,0,1},
+                {1,0,0,1,1,0,0,0,1,0,0,0,1,0,1},
+                {1,0,0,0,1,1,0,1,1,0,0,0,0,0,1},
+                {1,0,0,0,0,0,0,0,0,0,0,1,0,0,1},
+                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                {1,0,1,1,0,0,0,1,0,0,0,0,0,0,1},
+                {1,0,1,0,0,0,0,0,0,0,0,0,0,0,1},
+                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                {1,0,0,0,0,1,0,0,0,0,0,0,0,0,1},
+                {1,0,0,0,0,1,0,0,0,1,0,0,0,0,1},
+                {1,0,1,0,0,0,0,0,0,1,0,0,0,0,1},
+                {1,0,1,1,0,0,0,0,1,1,0,0,0,1,1},
+                {1,0,0,0,0,0,0,0,1,1,0,0,0,1,1},
+                {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
             };
+
+            int differentBuildings = _buildingHeights.Length - 1;
+
+            for (int x = 0; x < _floorPlan.GetLength (0); x++)
+            {
+                for (int y = 0; y < _floorPlan.GetLength (1); y++)
+                {
+                    if (_floorPlan[x, y] == 1)
+                    {
+                        _floorPlan[x, y] = _random.Next (differentBuildings) + 1;
+                    }
+                }
+            }
         }
 
         private void DrawCity ()
         {
-            _effect.CurrentTechnique = _effect.Techniques ["Textured"];
-            _effect.Parameters ["xWorld"].SetValue (Matrix.Identity);
-            _effect.Parameters ["xView"].SetValue (_viewMatrix);
-            _effect.Parameters ["xProjection"].SetValue (_projectionMatrix);
-            _effect.Parameters ["xTexture"].SetValue (_sceneryTexture);
+            _effect.CurrentTechnique = _effect.Techniques["Textured"];
+            _effect.Parameters["xWorld"].SetValue (Matrix.Identity);
+            _effect.Parameters["xView"].SetValue (_viewMatrix);
+            _effect.Parameters["xProjection"].SetValue (_projectionMatrix);
+            _effect.Parameters["xTexture"].SetValue (_sceneryTexture);
 
             foreach (EffectPass pass in _effect.CurrentTechnique.Passes)
             {
@@ -140,6 +222,44 @@ namespace _3D_FlightSim
                     _cityVertexBuffer.VertexCount / 3
                 );
             }
+        }
+
+        private void DrawModel (Model model)
+        {
+            float scale = 0.0005f;
+            Matrix worldMatrix =
+                Matrix.CreateScale (scale, scale, scale) *
+                Matrix.CreateRotationY (MathHelper.Pi) *
+                Matrix.CreateTranslation (new Vector3 (19, 12, -5));
+
+            Matrix[] transforms = new Matrix[model.Bones.Count];
+            model.CopyAbsoluteBoneTransformsTo (transforms);
+
+            foreach (var mesh in model.Meshes)
+            {
+                foreach (var effect in mesh.Effects)
+                {
+                    effect.CurrentTechnique = effect.Techniques["Colored"];
+                    effect.Parameters["xWorld"].SetValue (transforms[mesh.ParentBone.Index] * worldMatrix);
+                    effect.Parameters["xView"].SetValue (_viewMatrix);
+                    effect.Parameters["xProjection"].SetValue (_projectionMatrix);
+                }
+                mesh.Draw ();
+            }
+
+        }
+
+        private Model LoadModel (string assetName)
+        {
+            Model newModel = Content.Load<Model> (assetName);
+            foreach (var mesh in newModel.Meshes)
+            {
+                foreach (var part in mesh.MeshParts)
+                {
+                    part.Effect = _effect.Clone ();
+                }
+            }
+            return newModel;
         }
     }
 }

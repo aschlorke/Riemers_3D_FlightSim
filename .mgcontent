@@ -4,7 +4,7 @@
   <Platform>Windows</Platform>
   <Config />
   <SourceFiles>
-    <File>/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/texturemap.jpg</File>
+    <File>/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/xwing.x</File>
   </SourceFiles>
   <DestFiles>
     <File xsi:nil="true" />
