@@ -24,10 +24,18 @@ namespace _3D_FlightSim
         private Effect _effect;
         private Model _xwingModel;
 
+        private Vector3 _lightDirection = new Vector3 (3, -2, 5);
+        private float _ambientLight = 0.3f;
+
         private int[,] _floorPlan;
         private VertexBuffer _cityVertexBuffer;
 
         private int[] _buildingHeights = new int[] { 0, 2, 2, 6, 5, 4 };
+
+        private bool _isDebug = false;
+        private SpriteFont _debugFont;
+
+        private KeyboardState _lastKeyboardState;
 
         public Game1 ()
         {
@@ -46,6 +54,9 @@ namespace _3D_FlightSim
             Window.Title = "Riemer's 3D Flight Simulator";
 
             _random = new Random ();
+            _lightDirection.Normalize ();
+
+            _lastKeyboardState = Keyboard.GetState ();
 
             LoadFloorPlan ();
 
@@ -62,6 +73,8 @@ namespace _3D_FlightSim
 
             _xwingModel = LoadModel (@"Models\xwing");
 
+            _debugFont = Content.Load<SpriteFont> (@"Fonts\Arial\myFont");
+
             SetupCamera ();
             SetupVertices ();
         }
@@ -72,16 +85,54 @@ namespace _3D_FlightSim
                 Exit ();
 
             // TODO: Add your update logic here
+            ProcessKeyboard ();
 
             base.Update (gameTime);
+        }
+
+        private void ProcessKeyboard ()
+        {
+            KeyboardState keyState = Keyboard.GetState ();
+
+            if (keyState.IsKeyDown (Keys.Q) && _lastKeyboardState.IsKeyUp (Keys.Q))
+            {
+                _isDebug = !_isDebug;
+            }
+
+            if (_isDebug)
+            {
+                if (keyState.IsKeyDown (Keys.U) && _lastKeyboardState.IsKeyUp (Keys.U))
+                {
+                    _ambientLight += 0.05f;
+                }
+                if (keyState.IsKeyDown (Keys.J) && _lastKeyboardState.IsKeyUp (Keys.J))
+                {
+                    _ambientLight -= 0.05f;
+                }
+            }
+
+            _lastKeyboardState = keyState;
         }
 
         protected override void Draw (GameTime gameTime)
         {
             GraphicsDevice.Clear (ClearOptions.Target | ClearOptions.DepthBuffer, Color.DarkSlateBlue, 1.0f, 0);
 
+            GraphicsDevice.DepthStencilState = DepthStencilState.Default;
             DrawCity ();
             DrawModel (_xwingModel);
+
+            if (_isDebug)
+            {
+                _spriteBatch.Begin ();
+                _spriteBatch.DrawString (
+                    _debugFont,
+                    "DEBUG",
+                    new Vector2 (10, 10),
+                    Color.Red
+                );
+                _spriteBatch.End ();
+            }
 
             base.Draw (gameTime);
         }
@@ -211,6 +262,9 @@ namespace _3D_FlightSim
             _effect.Parameters["xView"].SetValue (_viewMatrix);
             _effect.Parameters["xProjection"].SetValue (_projectionMatrix);
             _effect.Parameters["xTexture"].SetValue (_sceneryTexture);
+            _effect.Parameters["xEnableLighting"].SetValue (true);
+            _effect.Parameters["xLightDirection"].SetValue (_lightDirection);
+            _effect.Parameters["xAmbient"].SetValue (_ambientLight);
 
             foreach (EffectPass pass in _effect.CurrentTechnique.Passes)
             {
@@ -243,6 +297,9 @@ namespace _3D_FlightSim
                     effect.Parameters["xWorld"].SetValue (transforms[mesh.ParentBone.Index] * worldMatrix);
                     effect.Parameters["xView"].SetValue (_viewMatrix);
                     effect.Parameters["xProjection"].SetValue (_projectionMatrix);
+                    _effect.Parameters["xEnableLighting"].SetValue (true);
+                    _effect.Parameters["xLightDirection"].SetValue (_lightDirection);
+                    _effect.Parameters["xAmbient"].SetValue (_ambientLight);
                 }
                 mesh.Draw ();
             }
