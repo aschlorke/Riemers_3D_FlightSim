@@ -39,6 +39,11 @@ namespace _3D_FlightSim
         private SpriteFont _debugFont;
 
         private KeyboardState _lastKeyboardState;
+        private float _gameSpeed = 1.0f;
+
+        // collision detection support
+        private BoundingBox[] _buildingboundingBoxes;
+        private BoundingBox _cityBounds;
 
         public Game1 ()
         {
@@ -80,6 +85,7 @@ namespace _3D_FlightSim
 
             SetupCamera ();
             SetupVertices ();
+            SetupBoundingBoxes ();
         }
 
         protected override void Update (GameTime gameTime)
@@ -89,14 +95,41 @@ namespace _3D_FlightSim
 
             // TODO: Add your update logic here
             UpdateCamera ();
-            ProcessKeyboard ();
+            ProcessKeyboard (gameTime);
+
+            var speed = gameTime.ElapsedGameTime.Milliseconds / 500.0f * _gameSpeed;
+            MoveForward (ref _xwingPosition, _xwingRotation, speed);
+
+            BoundingSphere xwingSphere = new BoundingSphere (_xwingPosition, 0.04f);
+            if (CheckCollision (xwingSphere) != CollisionType.None)
+            {
+                _xwingPosition = new Vector3 (8, 1, -3);
+                _xwingRotation = Quaternion.Identity;
+                _gameSpeed /= 1.1f;
+            }
 
             base.Update (gameTime);
         }
 
-        private void ProcessKeyboard ()
+        private void ProcessKeyboard (GameTime gameTime)
         {
             KeyboardState keyState = Keyboard.GetState ();
+
+            float leftRightRotation = 0;
+            float turningSpeed = (float)gameTime.ElapsedGameTime.TotalMilliseconds / 1000.0f;
+            turningSpeed *= 1.6f * _gameSpeed;
+
+            if (keyState.IsKeyDown (Keys.Right)) leftRightRotation += turningSpeed;
+            if (keyState.IsKeyDown (Keys.Left)) leftRightRotation -= turningSpeed;
+
+            float upDownRotation = 0;
+            if (keyState.IsKeyDown (Keys.Down)) upDownRotation += turningSpeed;
+            if (keyState.IsKeyDown (Keys.Up)) upDownRotation -= turningSpeed;
+
+            Quaternion additionalRotation =
+                Quaternion.CreateFromAxisAngle (new Vector3 (0, 0, -1), leftRightRotation) *
+                Quaternion.CreateFromAxisAngle (new Vector3 (1, 0, 0), upDownRotation);
+            _xwingRotation *= additionalRotation;
 
             if (keyState.IsKeyDown (Keys.Q) && _lastKeyboardState.IsKeyUp (Keys.Q))
             {
@@ -116,6 +149,12 @@ namespace _3D_FlightSim
             }
 
             _lastKeyboardState = keyState;
+        }
+
+        private void MoveForward (ref Vector3 position, Quaternion rotationQuat, float speed)
+        {
+            Vector3 addVector = Vector3.Transform (new Vector3 (0, 0, -1), rotationQuat);
+            position += addVector * speed;
         }
 
         protected override void Draw (GameTime gameTime)
@@ -342,6 +381,57 @@ namespace _3D_FlightSim
                 }
             }
             return newModel;
+        }
+
+        // collision detection support
+        private void SetupBoundingBoxes ()
+        {
+            int cityWidth = _floorPlan.GetLength (0);
+            int cityLength = _floorPlan.GetLength (1);
+
+            List<BoundingBox> bbList = new List<BoundingBox> ();
+            for (int x = 0; x < cityWidth; x++)
+            {
+                for (int z = 0; z < cityLength; z++)
+                {
+                    int buildingType = _floorPlan[x, z];
+                    if (buildingType != 0)
+                    {
+                        int buildingHeight = _buildingHeights[buildingType];
+                        Vector3[] buildingPoints = new Vector3[2];
+                        buildingPoints[0] = new Vector3 (x, 0, -z);
+                        buildingPoints[1] = new Vector3 (x + 1, buildingHeight, -z - 1);
+
+                        BoundingBox buildingBox = BoundingBox.CreateFromPoints (buildingPoints);
+                        bbList.Add (buildingBox);
+                    }
+                }
+            }
+
+            _buildingboundingBoxes = bbList.ToArray ();
+
+            Vector3[] boundaryPoints = new Vector3[2];
+            boundaryPoints[0] = Vector3.Zero;
+            boundaryPoints[1] = new Vector3 (cityWidth, 20, -cityLength);
+            _cityBounds = BoundingBox.CreateFromPoints (boundaryPoints);
+        }
+
+        private CollisionType CheckCollision (BoundingSphere sphere)
+        {
+            for (int i = 0; i < _buildingboundingBoxes.Length; i++)
+            {
+                if (_buildingboundingBoxes[i].Contains (sphere) != ContainmentType.Disjoint)
+                {
+                    return CollisionType.Building;
+                }
+            }
+
+            if (_cityBounds.Contains (sphere) != ContainmentType.Contains)
+            {
+                return CollisionType.Boundary;
+            }
+
+            return CollisionType.None;
         }
     }
 }
