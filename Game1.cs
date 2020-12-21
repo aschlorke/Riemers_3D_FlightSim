@@ -58,6 +58,11 @@ namespace _3D_FlightSim
 
         private Vector3 _cameraPosition;
         private Vector3 _cameraUpDirection;
+        private Quaternion _cameraRotation = Quaternion.Identity;
+
+        // skybox
+        private Texture2D[] _skyboxTextures;
+        private Model _skyboxModel;
 
 
         public Game1 ()
@@ -97,6 +102,7 @@ namespace _3D_FlightSim
 
             _xwingModel = LoadModel (@"Models\xwing");
             _targetModel = LoadModel (@"Models\target");
+            _skyboxModel = LoadModel (@"Skybox\skybox", out _skyboxTextures);
 
             _debugFont = Content.Load<SpriteFont> (@"Fonts\Arial\myFont");
 
@@ -202,6 +208,7 @@ namespace _3D_FlightSim
             GraphicsDevice.Clear (ClearOptions.Target | ClearOptions.DepthBuffer, Color.DarkSlateBlue, 1.0f, 0);
 
             GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+            DrawSkybox ();
             DrawCity ();
             DrawModel ();
             DrawTargets ();
@@ -230,18 +237,21 @@ namespace _3D_FlightSim
 
         private void UpdateCamera ()
         {
+            // have the camera lag behind x wing rotation
+            _cameraRotation = Quaternion.Lerp (_cameraRotation, _xwingRotation, 0.1f);
+
             // offset from xwing model
             Vector3 cameraPosition = new Vector3 (0, 0.1f, 0.6f);
 
             // rotate the camera to align with the rotation of the xwing 
-            cameraPosition = Vector3.Transform (cameraPosition, Matrix.CreateFromQuaternion (_xwingRotation));
+            cameraPosition = Vector3.Transform (cameraPosition, Matrix.CreateFromQuaternion (_cameraRotation));
 
             // move the camera so that it ligns up behind the xwing
             cameraPosition += _xwingPosition;
 
             // based on the rotation, figure out which direction is 'up' for the camera
             Vector3 cameraUp = Vector3.Up;
-            cameraUp = Vector3.Transform (cameraUp, Matrix.CreateFromQuaternion (_xwingRotation));
+            cameraUp = Vector3.Transform (cameraUp, Matrix.CreateFromQuaternion (_cameraRotation));
 
             // update the view and projection matrices
             _viewMatrix = Matrix.CreateLookAt (cameraPosition, _xwingPosition, cameraUp);
@@ -427,6 +437,28 @@ namespace _3D_FlightSim
             return newModel;
         }
 
+        private Model LoadModel (string assetName, out Texture2D[] textures)
+        {
+            var newModel = Content.Load<Model> (assetName);
+            List<Texture2D> modelTextures = new List<Texture2D> ();
+
+            foreach (var mesh in newModel.Meshes)
+            {
+                foreach (BasicEffect effect in mesh.Effects)
+                {
+                    modelTextures.Add (effect.Texture);
+                }
+
+                foreach (var meshPart in mesh.MeshParts)
+                {
+                    meshPart.Effect = _effect.Clone ();
+                }
+            }
+
+            textures = modelTextures.ToArray ();
+            return newModel;
+        }
+
         // targets
         private void AddTargets ()
         {
@@ -601,6 +633,47 @@ namespace _3D_FlightSim
                 }
                 _device.BlendState = BlendState.Opaque;
             }
+        }
+
+        // skybox
+        private void DrawSkybox ()
+        {
+            SamplerState ss = new SamplerState ()
+            {
+                AddressU = TextureAddressMode.Clamp,
+                AddressV = TextureAddressMode.Clamp
+            };
+            _device.SamplerStates[0] = ss;
+
+            DepthStencilState dss = new DepthStencilState ()
+            {
+                DepthBufferEnable = false
+            };
+            _device.DepthStencilState = dss;
+
+            Matrix[] skyboxTransforms = new Matrix[_skyboxModel.Bones.Count];
+            _skyboxModel.CopyAbsoluteBoneTransformsTo (skyboxTransforms);
+            int i = 0;
+
+            foreach (var mesh in _skyboxModel.Meshes)
+            {
+                foreach (var effect in mesh.Effects)
+                {
+                    Matrix worldMatrix = skyboxTransforms[mesh.ParentBone.Index] * Matrix.CreateTranslation (_xwingPosition);
+                    effect.CurrentTechnique = effect.Techniques["Textured"];
+                    effect.Parameters["xWorld"].SetValue (worldMatrix);
+                    effect.Parameters["xView"].SetValue (_viewMatrix);
+                    effect.Parameters["xProjection"].SetValue (_projectionMatrix);
+                    effect.Parameters["xTexture"].SetValue (_skyboxTextures[i++]);
+                }
+                mesh.Draw ();
+            }
+
+            dss = new DepthStencilState ()
+            {
+                DepthBufferEnable = true
+            };
+            _device.DepthStencilState = dss;
         }
     }
 }
