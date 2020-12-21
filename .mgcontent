@@ -4,7 +4,7 @@
   <Platform>Windows</Platform>
   <Config />
   <SourceFiles>
-    <File>/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/Models/target.x</File>
+    <File>/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/Textures/bullet.jpg</File>
   </SourceFiles>
   <DestFiles>
     <File xsi:nil="true" />

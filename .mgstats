@@ -1,2 +1,2 @@
 Source File,Dest File,Processor Type,Content Type,Source File Size,Dest File Size,Build Seconds
-"/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/Models/target.x","/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/Models/target.xnb","ModelProcessor","ModelContent",13707,4328,0.231995
+"/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/Textures/bullet.jpg","/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/Textures/bullet.xnb","TextureProcessor","Texture2DContent",3404,16469,0.123602

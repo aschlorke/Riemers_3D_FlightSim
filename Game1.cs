@@ -50,6 +50,15 @@ namespace _3D_FlightSim
         private Model _targetModel;
         private const int _maxTargets = 50;
 
+        // bullets
+        private List<Bullet> _bulletList = new List<Bullet> ();
+        private double _lastBulletTime = 0;
+        private double _bulletCooldownTime = 100;
+        private Texture2D _bulletTexture;
+
+        private Vector3 _cameraPosition;
+        private Vector3 _cameraUpDirection;
+
 
         public Game1 ()
         {
@@ -82,6 +91,7 @@ namespace _3D_FlightSim
             _spriteBatch = new SpriteBatch (GraphicsDevice);
 
             _sceneryTexture = Content.Load<Texture2D> (@"Textures\texturemap");
+            _bulletTexture = Content.Load<Texture2D> (@"Textures\bullet");
             byte[] bytecode = File.ReadAllBytes (@"Content/CompiledEffects/effects.mgfx");
             _effect = new Effect (_device, bytecode);
 
@@ -116,12 +126,16 @@ namespace _3D_FlightSim
                 _gameSpeed /= 1.1f;
             }
 
+            UpdateBulletPositions (speed);
+
             base.Update (gameTime);
         }
 
         private void ProcessKeyboard (GameTime gameTime)
         {
             KeyboardState keyState = Keyboard.GetState ();
+
+            // moving
 
             float leftRightRotation = 0;
             float turningSpeed = (float)gameTime.ElapsedGameTime.TotalMilliseconds / 1000.0f;
@@ -138,6 +152,24 @@ namespace _3D_FlightSim
                 Quaternion.CreateFromAxisAngle (new Vector3 (0, 0, -1), leftRightRotation) *
                 Quaternion.CreateFromAxisAngle (new Vector3 (1, 0, 0), upDownRotation);
             _xwingRotation *= additionalRotation;
+
+            // shooting
+            if (keyState.IsKeyDown (Keys.Space))
+            {
+                double currentTime = gameTime.TotalGameTime.TotalMilliseconds;
+                if (currentTime - _lastBulletTime > _bulletCooldownTime)
+                {
+                    _bulletList.Add (
+                        new Bullet ()
+                        {
+                            Position = _xwingPosition,
+                            Rotation = _xwingRotation
+                        }
+                    );
+
+                    _lastBulletTime = currentTime;
+                }
+            }
 
             if (keyState.IsKeyDown (Keys.Q) && _lastKeyboardState.IsKeyUp (Keys.Q))
             {
@@ -173,6 +205,7 @@ namespace _3D_FlightSim
             DrawCity ();
             DrawModel ();
             DrawTargets ();
+            DrawBullets ();
 
             if (_isDebug)
             {
@@ -213,6 +246,8 @@ namespace _3D_FlightSim
             // update the view and projection matrices
             _viewMatrix = Matrix.CreateLookAt (cameraPosition, _xwingPosition, cameraUp);
             _projectionMatrix = Matrix.CreatePerspectiveFieldOfView (MathHelper.PiOver4, _device.Viewport.AspectRatio, 0.2f, 500.0f);
+            _cameraPosition = cameraPosition;
+            _cameraUpDirection = cameraUp;
         }
 
         private void SetupVertices ()
@@ -370,9 +405,9 @@ namespace _3D_FlightSim
                     effect.Parameters["xWorld"].SetValue (transforms[mesh.ParentBone.Index] * worldMatrix);
                     effect.Parameters["xView"].SetValue (_viewMatrix);
                     effect.Parameters["xProjection"].SetValue (_projectionMatrix);
-                    _effect.Parameters["xEnableLighting"].SetValue (true);
-                    _effect.Parameters["xLightDirection"].SetValue (_lightDirection);
-                    _effect.Parameters["xAmbient"].SetValue (_ambientLight);
+                    effect.Parameters["xEnableLighting"].SetValue (true);
+                    effect.Parameters["xLightDirection"].SetValue (_lightDirection);
+                    effect.Parameters["xAmbient"].SetValue (_ambientLight);
                 }
                 mesh.Draw ();
             }
@@ -502,6 +537,55 @@ namespace _3D_FlightSim
             }
 
             return CollisionType.None;
+        }
+
+        private void UpdateBulletPositions (float moveSpeed)
+        {
+            for (int i = 0; i < _bulletList.Count; i++)
+            {
+                Bullet currentBullet = _bulletList[i];
+                MoveForward (ref currentBullet.Position, currentBullet.Rotation, moveSpeed * 2.0f);
+                _bulletList[i] = currentBullet;
+            }
+        }
+
+        private void DrawBullets ()
+        {
+            if (_bulletList.Count > 0)
+            {
+                VertexPositionTexture[] bulletVertices = new VertexPositionTexture[_bulletList.Count * 6];
+                int i = 0;
+                foreach (var bullet in _bulletList)
+                {
+                    Vector3 center = bullet.Position;
+
+                    // bottom right->upper left->upper right
+                    bulletVertices[i++] = new VertexPositionTexture (center, new Vector2 (1, 1));
+                    bulletVertices[i++] = new VertexPositionTexture (center, new Vector2 (0, 0));
+                    bulletVertices[i++] = new VertexPositionTexture (center, new Vector2 (1, 0));
+
+                    // bottom right->lower left->upper left
+                    bulletVertices[i++] = new VertexPositionTexture (center, new Vector2 (1, 1));
+                    bulletVertices[i++] = new VertexPositionTexture (center, new Vector2 (0, 1));
+                    bulletVertices[i++] = new VertexPositionTexture (center, new Vector2 (0, 0));
+                }
+
+
+                _effect.CurrentTechnique = _effect.Techniques["PointSprites"];
+                _effect.Parameters["xWorld"].SetValue (Matrix.Identity);
+                _effect.Parameters["xProjection"].SetValue (_projectionMatrix);
+                _effect.Parameters["xView"].SetValue (_viewMatrix);
+                _effect.Parameters["xCamPos"].SetValue (_cameraPosition);
+                _effect.Parameters["xCamUp"].SetValue (_cameraUpDirection);
+                _effect.Parameters["xTexture"].SetValue (_bulletTexture);
+                _effect.Parameters["xPointSpriteSize"].SetValue (0.1f);
+
+                foreach (var pass in _effect.CurrentTechnique.Passes)
+                {
+                    pass.Apply ();
+                    _device.DrawUserPrimitives (PrimitiveType.TriangleList, bulletVertices, 0, _bulletList.Count * 2);
+                }
+            }
         }
     }
 }
