@@ -4,9 +4,21 @@
   <Platform>Windows</Platform>
   <Config />
   <SourceFiles>
-    <File>/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/Fonts/Arial/myFont.spritefont</File>
+    <File>/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/Skybox/skybox.x</File>
+    <File>/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/Skybox/skybox_back.JPG</File>
+    <File>/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/Skybox/skybox_bottom.JPG</File>
+    <File>/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/Skybox/skybox_front.JPG</File>
+    <File>/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/Skybox/skybox_left.JPG</File>
+    <File>/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/Skybox/skybox_right.JPG</File>
+    <File>/Users/aaronschlorke/Projects/Monogame/Tutorials/Riemers/3D_FlightSim/Content/Skybox/skybox_top.JPG</File>
   </SourceFiles>
   <DestFiles>
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
     <File xsi:nil="true" />
   </DestFiles>
 </SourceFileCollection>
