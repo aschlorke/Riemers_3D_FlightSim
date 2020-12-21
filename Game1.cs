@@ -541,11 +541,24 @@ namespace _3D_FlightSim
 
         private void UpdateBulletPositions (float moveSpeed)
         {
-            for (int i = 0; i < _bulletList.Count; i++)
+            for (int i = _bulletList.Count - 1; i >= 0; i--)
             {
                 Bullet currentBullet = _bulletList[i];
                 MoveForward (ref currentBullet.Position, currentBullet.Rotation, moveSpeed * 2.0f);
                 _bulletList[i] = currentBullet;
+
+                var bulletSphere = new BoundingSphere (currentBullet.Position, 0.05f);
+                var colType = CheckCollision (bulletSphere);
+
+                if (colType != CollisionType.None)
+                {
+                    _bulletList.RemoveAt (i);
+
+                    if (colType == CollisionType.Target)
+                    {
+                        _gameSpeed *= 1.05f;
+                    }
+                }
             }
         }
 
@@ -580,11 +593,13 @@ namespace _3D_FlightSim
                 _effect.Parameters["xTexture"].SetValue (_bulletTexture);
                 _effect.Parameters["xPointSpriteSize"].SetValue (0.1f);
 
+                _device.BlendState = BlendState.Additive;
                 foreach (var pass in _effect.CurrentTechnique.Passes)
                 {
                     pass.Apply ();
                     _device.DrawUserPrimitives (PrimitiveType.TriangleList, bulletVertices, 0, _bulletList.Count * 2);
                 }
+                _device.BlendState = BlendState.Opaque;
             }
         }
     }
