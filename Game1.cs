@@ -44,6 +44,12 @@ namespace _3D_FlightSim
         // collision detection support
         private BoundingBox[] _buildingboundingBoxes;
         private BoundingBox _cityBounds;
+        private List<BoundingSphere> _targetList = new List<BoundingSphere> ();
+
+        // targets 
+        private Model _targetModel;
+        private const int _maxTargets = 50;
+
 
         public Game1 ()
         {
@@ -80,12 +86,14 @@ namespace _3D_FlightSim
             _effect = new Effect (_device, bytecode);
 
             _xwingModel = LoadModel (@"Models\xwing");
+            _targetModel = LoadModel (@"Models\target");
 
             _debugFont = Content.Load<SpriteFont> (@"Fonts\Arial\myFont");
 
             SetupCamera ();
             SetupVertices ();
             SetupBoundingBoxes ();
+            AddTargets ();
         }
 
         protected override void Update (GameTime gameTime)
@@ -164,6 +172,7 @@ namespace _3D_FlightSim
             GraphicsDevice.DepthStencilState = DepthStencilState.Default;
             DrawCity ();
             DrawModel ();
+            DrawTargets ();
 
             if (_isDebug)
             {
@@ -383,6 +392,56 @@ namespace _3D_FlightSim
             return newModel;
         }
 
+        // targets
+        private void AddTargets ()
+        {
+            int cityWidth = _floorPlan.GetLength (0);
+            int cityLength = _floorPlan.GetLength (1);
+
+            while (_targetList.Count < _maxTargets)
+            {
+                int x = _random.Next (cityWidth);
+                int z = -_random.Next (cityLength);
+                float y = (float)_random.Next (2000) / 1000f + 1;
+                float radius = (float)_random.Next (1000) / 1000f * 0.2f + 0.01f;
+
+                BoundingSphere newTarget = new BoundingSphere (new Vector3 (x, y, z), radius);
+
+                if (CheckCollision (newTarget) == CollisionType.None)
+                {
+                    _targetList.Add (newTarget);
+                }
+            }
+        }
+
+        private void DrawTargets ()
+        {
+            for (int i = 0; i < _targetList.Count; i++)
+            {
+                Matrix worldMatrix =
+                    Matrix.CreateScale (_targetList[i].Radius) *
+                    Matrix.CreateTranslation (_targetList[i].Center);
+
+                Matrix[] targetTransforms = new Matrix[_targetModel.Bones.Count];
+                _targetModel.CopyAbsoluteBoneTransformsTo (targetTransforms);
+
+                foreach (var mesh in _targetModel.Meshes)
+                {
+                    foreach (var effect in mesh.Effects)
+                    {
+                        effect.CurrentTechnique = effect.Techniques["Colored"];
+                        effect.Parameters["xWorld"].SetValue (targetTransforms[mesh.ParentBone.Index] * worldMatrix);
+                        effect.Parameters["xView"].SetValue (_viewMatrix);
+                        effect.Parameters["xProjection"].SetValue (_projectionMatrix);
+                        effect.Parameters["xEnableLighting"].SetValue (true);
+                        effect.Parameters["xLightDirection"].SetValue (_lightDirection);
+                        effect.Parameters["xAmbient"].SetValue (_ambientLight);
+                    }
+                    mesh.Draw ();
+                }
+            }
+        }
+
         // collision detection support
         private void SetupBoundingBoxes ()
         {
@@ -429,6 +488,17 @@ namespace _3D_FlightSim
             if (_cityBounds.Contains (sphere) != ContainmentType.Contains)
             {
                 return CollisionType.Boundary;
+            }
+
+            for (int i = _targetList.Count - 1; i >= 0; i--)
+            {
+                if (_targetList[i].Contains (sphere) != ContainmentType.Disjoint)
+                {
+                    _targetList.RemoveAt (i);
+                    AddTargets ();
+
+                    return CollisionType.Target;
+                }
             }
 
             return CollisionType.None;
